@@ -15,7 +15,8 @@ DESCRIPTION
     Backups a Git repository by bundling it with all its references. The bundle is then packed as tar ball.
     The archive will be placed in the current directory by default.
 
-    Unless otherwise specified via '-x' or '--no-script', a simple script to conveniently clone the bundle into the current directory is added to archive.
+    Unless otherwise specified via '-x' or '--no-script', a simple script to conveniently clone the bundle into
+    the current directory is added to archive.
 
 OPTIONS:
     -f, --file <FILE>   Custom path for the generated tar ball
@@ -32,19 +33,23 @@ EXAMPLES:
 
 ## Example Usage
 
+Create the Backup
 ````lang=shell
-# Create backup
 $ ./git-bak -u https://github.com/jazzschmidt/git-bak.git -f archive.tar.gz
+````
 
-# Unpack the archive
+Unpack the archive
+````lang=shell
 $ tar -xzf archive.tar.gz
 $ ls -loh
 total 112
 -rw-r--r--  1 user    23K Apr 16 17:16 archive.tar.gz
 -rwxr-xr-x  1 user   163B Apr 16 17:16 checkout
 -rw-r--r--  1 user    24K Apr 16 17:16 gitbundle
+````
 
-# Clone the repo
+Clone the repo
+````lang=shell
 $ ./checkout
 Cloning into 'git-bak'...
 Receiving objects: 100% (190/190), 23.97 KiB | 7.99 MiB/s, done.
