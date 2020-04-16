@@ -6,6 +6,9 @@ WORKING_DIR=$(pwd)
 # Disabled when not in verbose mode
 LOG="/dev/null"
 
+# Disabled when -x or --no-script is set
+CREATE_CLONE_SCRIPT=true
+
 function b() {
   tput bold; printf "$1"; tput sgr0;
 }
@@ -29,17 +32,25 @@ $(b NAME)
     $SCRIPT_NAME - Backup a Git repository
 
 $(b SYNOPSIS)
-    $SCRIPT_NAME [-f $(u archive)] -u $(u url)
+    $SCRIPT_NAME [-x] [-f $(u archive)] -u $(u url)
 
 $(b DESCRIPTION)
     Backups a Git repository by bundling it with all its references. The bundle is then packed as tar ball.
-    The backup file will be placed in the current directory by default.
+    The archive will be placed in the current directory by default.
+
+    Unless otherwise specified via '-x' or '--no-script', a simple script to conveniently clone the bundle into the current directory is added to archive.
 
 $(b OPTIONS:)
     -f, --file <FILE>   Custom path for the generated tar ball
     -u, --url <URL>     Tells which url to clone the Git repository from
     -h, --help          Shows this help message
     -v, --verbose       Increases verbosity
+    -x, --no-script     Skips creation of the clone script
+
+$(b EXAMPLES:)
+    Backup a remote repository that is saved as 'repo.tar.gz' in the current directory along with the clone script.
+
+        $SCRIPT_NAME -u https://example.com/projects/repo.git
 
 EOF
 }
@@ -96,6 +107,9 @@ while [ $# -gt 0 ]; do
       LOG=1
       log "Increasing verbosity"
       ;;
+    -x|--no-script)
+      CREATE_CLONE_SCRIPT=false
+      ;;
     *)
       err "Unknown argument: $1"
       exit 1
@@ -141,13 +155,18 @@ log "Cloning into: $CLONE_DIR"
   git bundle create "gitbundle" --all 1>&$LOG
 
   # Add simple checkout script
-  log "Creating clone script for $REPO_NAME"
-  create_clone_script "checkout" $REPO_NAME
-  chmod +x checkout
+  if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then
+    log "Creating clone script for $REPO_NAME"
+    create_clone_script "checkout" $REPO_NAME
+    chmod +x checkout
+  fi
 )
 
+ARCHIVE_FILES="gitbundle"
+if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then ARCHIVE_FILES="$ARCHIVE_FILES checkout"; fi
+
 # Create archive
-tar -czf $FILE -C $CLONE_DIR gitbundle checkout
+tar -czf $FILE -C $CLONE_DIR $ARCHIVE_FILES
 
 log "Removing temprorary clone directory"
 # Remove clone directory
