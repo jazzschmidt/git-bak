@@ -141,6 +141,7 @@ log "Cloning into: $CLONE_DIR"
   git bundle create "gitbundle" --all 1>&$LOG
 
   # Add simple checkout script
+  log "Creating clone script for $REPO_NAME"
   create_clone_script "checkout" $REPO_NAME
   chmod +x checkout
 )
@@ -148,5 +149,6 @@ log "Cloning into: $CLONE_DIR"
 # Create archive
 tar -czf $FILE -C $CLONE_DIR gitbundle checkout
 
+log "Removing temprorary clone directory"
 # Remove clone directory
 rm -rf $CLONE_DIR
