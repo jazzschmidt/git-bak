@@ -1,5 +1,7 @@
 # git-bak
-Fully backups and archives a Git repository in a tar ball. The backup archive is equipped with a convenient clone script.
+Simple almost-one-click Git backups.
+
+Fully backups and archives a Git repository in a tar ball. The backup archive is equipped with a convenient script to directly clone it with a single (double-)click or by calling it.
 
 ## Overview
 Output from `--help` argument:
@@ -32,13 +34,12 @@ EXAMPLES:
 ````
 
 ## Example Usage
-
-Create the Backup
+#### Create the Backup
 ````lang=shell
 $ ./git-bak -u https://github.com/jazzschmidt/git-bak.git -f archive.tar.gz
 ````
 
-Unpack the archive
+#### Unpack the archive somewhere
 ````lang=shell
 $ tar -xzf archive.tar.gz
 $ ls -loh
@@ -48,10 +49,11 @@ total 112
 -rw-r--r--  1 user    24K Apr 16 17:16 gitbundle
 ````
 
-Clone the repo
+#### Clone the repository
+Either directly click on the `checkout` script or call it from the terminal. By using the latter, it is also possible to define another directory to clone to.
 ````lang=shell
-$ ./checkout
-Cloning into 'git-bak'...
+$ ./checkout ~/workspace/project
+Cloning into '/Users/user/workspace/project'...
 Receiving objects: 100% (190/190), 23.97 KiB | 7.99 MiB/s, done.
 Resolving deltas: 100% (77/77), done.
 ````
