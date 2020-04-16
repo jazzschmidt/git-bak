@@ -1,0 +1,152 @@
+#!/bin/bash
+
+SCRIPT_NAME=$(basename $0)
+WORKING_DIR=$(pwd)
+
+# Disabled when not in verbose mode
+LOG="/dev/null"
+
+function b() {
+  tput bold; printf "$1"; tput sgr0;
+}
+
+function u() {
+  tput smul; printf "$1"; tput sgr0;
+}
+
+function err() {
+  >&2 printf "$1\n"
+  >&2 printf "Try '$SCRIPT_NAME --help' for more information\n"
+}
+
+function log() {
+  >&$LOG printf "[INFO] $1\n"
+}
+
+function print_usage() {
+  cat << EOF
+$(b NAME)
+    $SCRIPT_NAME - Backup a Git repository
+
+$(b SYNOPSIS)
+    $SCRIPT_NAME [-f $(u archive)] -u $(u url)
+
+$(b DESCRIPTION)
+    Backups a Git repository by bundling it with all its references. The bundle is then packed as tar ball.
+    The backup file will be placed in the current directory by default.
+
+$(b OPTIONS:)
+    -f, --file <FILE>   Custom path for the generated tar ball
+    -u, --url <URL>     Tells which url to clone the Git repository from
+    -h, --help          Shows this help message
+    -v, --verbose       Increases verbosity
+
+EOF
+}
+
+function get_url_repository_name() {
+  url=$1
+
+  # Remove trailing / from url
+  if [[ "$url" = */ ]]; then url=${url##*/}; fi
+
+  # Extract last path
+  url=${url##*/}
+
+  # Remove git prefix
+  printf ${url%*.git}
+}
+
+function create_clone_script() {
+  file=$1
+  clone_dir=$2
+
+  cat > $file <<EOF
+#!/bin/bash -e
+
+DIR=\$(dirname \$0)
+
+# Clone into current dir or use script parameters
+LOCAL_REPO=\${*:-${clone_dir}}
+
+(
+  cd \$DIR
+  git clone gitbundle \$LOCAL_REPO
+)
+
+EOF
+}
+
+# Read arguments
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --url*|-u*)
+      if [[ "$1" != *=* ]]; then shift; fi
+      URL="${1#*=}"
+      ;;
+    --file*|-f*)
+      if [[ "$1" != *=* ]]; then shift; fi
+      FILE="${1#*=}"
+      ;;
+    --help|-h)
+      print_usage
+      exit
+      ;;
+    --verbose|-v)
+      LOG=1
+      log "Increasing verbosity"
+      ;;
+    *)
+      err "Unknown argument: $1"
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+# Verify url
+if [ -z "$URL" ]; then
+  err "Repository url must be specified."
+  exit 1
+fi
+
+log "Determining repository name from $URL"
+REPO_NAME=$(get_url_repository_name "$URL")
+log "Repository name: $REPO_NAME"
+
+# Set file name
+if [ -z "$FILE" ]; then
+  FILE=$WORKING_DIR/${REPO_NAME}.tar.gz
+fi
+
+log "File path: $FILE"
+
+# Verify file
+touch $FILE &>/dev/null
+if [ $? -gt 0 ]; then
+  err "Cannot create file: $FILE"
+  exit 1
+fi
+
+# Create clone directory
+CLONE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${SCRIPT_NAME}.XXX")
+log "Cloning into: $CLONE_DIR"
+
+# Create the backup
+(
+  cd $CLONE_DIR
+  git clone --mirror $URL . 1>&$LOG
+
+  # Create git bundle
+  git bundle create "gitbundle" --all 1>&$LOG
+
+  # Add simple checkout script
+  create_clone_script "checkout" $REPO_NAME
+  chmod +x checkout
+)
+
+# Create archive
+tar -czf $FILE -C $CLONE_DIR gitbundle checkout
+
+# Remove clone directory
+rm -rf $CLONE_DIR
