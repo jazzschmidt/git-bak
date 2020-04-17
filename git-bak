@@ -104,8 +104,8 @@ function parse_args() {
     -v --verbose \
     -x --no-script
   )
-  if ! [ -z "$unknown_arg" ]; then
-    err "Unknown argument: $unknown_arg"; exit 1;
+  if [ -n "$unknown_arg" ]; then
+    err "Unknown argument: $unknown_arg";
   fi
 
 
@@ -204,7 +204,7 @@ function get_url_repository_name() {
 
 function cleanup() {
   # Remove the temporary clone dir
-  if ! [ -z "$CLONE_DIR" ]; then
+  if [ -n "$CLONE_DIR" ]; then
     log "Removing temprorary clone directory"
     rm -rf $CLONE_DIR
   fi
