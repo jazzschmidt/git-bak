@@ -77,10 +77,14 @@ function main() {
   log "Cloning into: $CLONE_DIR"
 
   # Create the backup
-  create_backup
+  create_backup $URL $CLONE_DIR
 
+  # Add convenience checkout script to the directory
   ARCHIVE_FILES="gitbundle"
-  if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then ARCHIVE_FILES="$ARCHIVE_FILES checkout"; fi
+  if $CREATE_CLONE_SCRIPT; then
+    create_clone_script "$REPO_NAME" "$CLONE_DIR/checkout"
+    ARCHIVE_FILES+=" checkout"
+  fi
 
   # Create archive
   tar -czf $FILE -C $CLONE_DIR $ARCHIVE_FILES
@@ -103,8 +107,8 @@ function get_arg() {
 }
 
 function get_arg_req() {
-  arg=$(get_arg "$1" ${*:2})
-  test -n "$arg"
+  local arg=$(get_arg "$1" ${*:2})
+  test -n "$arg" && echo "$arg"
 }
 
 function get_arg_opt() {
@@ -125,19 +129,14 @@ function get_unmatched_arg() {
 }
 
 function create_backup() {
+  local url=$1; local dir=$2;
+  # Clone the repo
+  git clone --mirror "$url" "$dir" 1>&$LOG
+
+  # Create git bundle
   (
-    cd $CLONE_DIR
-    git clone --mirror $URL . 1>&$LOG
-
-    # Create git bundle
+    cd "$dir"
     git bundle create "gitbundle" --all 1>&$LOG
-
-    # Add simple checkout script
-    if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then
-      log "Creating clone script for $REPO_NAME"
-      create_clone_script "checkout" $REPO_NAME
-      chmod +x checkout
-    fi
   )
 }
 
@@ -189,7 +188,7 @@ EOF
 }
 
 function get_url_repository_name() {
-  url=$1
+  local url=$1
 
   # Remove trailing / from url
   if [[ "$url" = */ ]]; then url=${url##*/}; fi
@@ -198,7 +197,7 @@ function get_url_repository_name() {
   url=${url##*/}
 
   # Remove git prefix
-  printf ${url%*.git}
+  echo "${url%*.git}"
 }
 
 function cleanup() {
@@ -210,16 +209,18 @@ function cleanup() {
 }
 
 function create_clone_script() {
-  file=$1
-  clone_dir=$2
+  local repo_name=$1; local file=$2
 
-  cat > $file <<EOF
+  log "Creating clone script for $repo_name"
+  touch "$file" && chmod +x "$file"
+
+  cat > "$file" <<EOF
 #!/bin/bash -e
 
 DIR=\$(dirname \$0)
 
 # Clone into current dir or use script parameters
-LOCAL_REPO=\${*:-${clone_dir}}
+LOCAL_REPO=\${*:-${repo_name}}
 
 (
   cd \$DIR
