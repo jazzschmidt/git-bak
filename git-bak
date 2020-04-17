@@ -3,35 +3,44 @@
 # Register cleanup
 trap cleanup EXIT SIGINT SIGTERM
 
-SCRIPT_NAME=$(basename $0)
-WORKING_DIR=$(pwd)
+CLONE_DIR=
+function cleanup() {
+  # Remove the temporary clone dir
+  if [ -n "$CLONE_DIR" ]; then
+    log "Removing temprorary clone directory"
+    rm -rf $CLONE_DIR
+  fi
+}
 
-# Stream to print logs to. Will set to stdout with verbose mode enabled
+declare -r SCRIPT_NAME=$(basename $0)
+declare -r WORKING_DIR=$(pwd)
+
+# Stream to print logs to.
+# Will be set to stdout with verbose mode enabled
 LOG="/dev/null"
 
-# Disabled when -x or --no-script is set
-CREATE_CLONE_SCRIPT=true
 
-# Repository url
-URL=
 
-# Humanish name of the repository
-REPO_NAME=
 
-# Archive name
-FILE=
 
-# Temporary diretory to clone to
-CLONE_DIR=
 
-# Which files to archive
-ARCHIVE_FILES=
 
+####################################
+##          Main program          ##
+####################################
+
+##
+# Main entry point
+##
 function main() {
-  argv=$*
+  local argv=$*
+  local url; local repo_name
+  local tmp_dir
+  local clone_script
+  local tgz_file; local archive_files
 
   # Catch unknown arguments
-  unknown_arg=$(get_unmatched_arg "$argv" \
+  local unknown_arg=$(get_unmatched_arg "$argv" \
     -u --url \
     -f --file \
     -h --help \
@@ -54,160 +63,85 @@ function main() {
 
   # Disable clone script
   if has_arg "$argv" -x --no-script; then
-    CREATE_CLONE_SCRIPT=false
+    clone_script=false
+  else
+    clone_script=true
   fi
 
   # Backup arguments
-  URL=$(get_arg_req "$argv" -u --url) || err "Repository url must be specified."
-  FILE=$(get_arg_opt "$argv" -f --file)
+  url=$(get_arg_req "$argv" -u --url) || err "Repository url must be specified."
+  tgz_file=$(get_arg_opt "$argv" -f --file)
 
-  log "Determining repository name from $URL"
-  REPO_NAME=$(get_url_repository_name "$URL")
-  log "Repository name: $REPO_NAME"
+  # Set repo name
+  log "Determining repository name from $url"
+  repo_name=$(get_url_repository_name "$url")
+  log "Repository name: $repo_name"
 
   # Set file name if not specified
-  if [ -z "$FILE" ]; then
-    FILE=$WORKING_DIR/${REPO_NAME}.tar.gz
+  if [ -z "$tgz_file" ]; then
+    tgz_file=$WORKING_DIR/${repo_name}.tar.gz
   fi
 
-  log "Archive will be written to: $FILE"
+  log "Archive will be written to: $tgz_file"
 
   # Create clone directory
-  CLONE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${SCRIPT_NAME}.XXX")
-  log "Cloning into: $CLONE_DIR"
+  tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/${SCRIPT_NAME}.XXX")
+  log "Cloning into: $tmp_dir"
+  # Must be set to be cleaned afterwards
+  CLONE_DIR="$tmp_dir"
 
   # Create the backup
-  create_backup $URL $CLONE_DIR
+  create_backup $url $tmp_dir
 
   # Add convenience checkout script to the directory
-  ARCHIVE_FILES="gitbundle"
-  if $CREATE_CLONE_SCRIPT; then
-    create_clone_script "$REPO_NAME" "$CLONE_DIR/checkout"
-    ARCHIVE_FILES+=" checkout"
+  archive_files="gitbundle"
+  if $clone_script; then
+    create_clone_script "$repo_name" "$tmp_dir/checkout"
+    archive_files+=" checkout"
   fi
 
   # Create archive
-  tar -czf $FILE -C $CLONE_DIR $ARCHIVE_FILES
+  tar -czf $tgz_file -C $tmp_dir $archive_files
 }
 
-function get_arg() {
-  local args=$1
-  local key1=$2; local key2=$3;
-  local arg
-  local found_key=false
 
-  for arg in $args; do
-    if [ "$found_key" = true ]; then val=$arg; break; fi
-    if [[ "$arg " = "$key1 " ]] || [[ "$arg " = "$key2 " ]]; then found_key=true; fi
-    if [[ "$arg" = "$key1="* ]] || [[ "$arg" = "$key2="* ]]; then found_key=true; val="${arg#*=}"; break; fi
-  done
 
-  echo "$val"
-  return $($found_key)
-}
 
-function get_arg_req() {
-  local arg=$(get_arg "$1" ${*:2})
-  test -n "$arg" && echo "$arg"
-}
 
-function get_arg_opt() {
-  get_arg "$1" ${*:2} || echo ""
-}
 
-function has_arg() {
-  get_arg "$1" ${*:2} >/dev/null
-}
 
-function get_unmatched_arg() {
-  local args=$1; local arg; local valid=${*:2}
-  for arg in $args; do
-    if [[ "$arg" = -* ]] && [[ ! " ${valid[*]} " = *" $arg "* ]]; then
-      echo "$arg"; break
-    fi
-  done
-}
+####################################
+##          Program logic         ##
+####################################
 
+##
+# Creates the git bundle from the git repo $1 into dir $2
+##
 function create_backup() {
   local url=$1; local dir=$2;
   # Clone the repo
   git clone --mirror "$url" "$dir" 1>&$LOG
-
   # Create git bundle
-  (
-    cd "$dir"
-    git bundle create "gitbundle" --all 1>&$LOG
-  )
+  (cd "$dir" && git bundle create "gitbundle" --all) 1>&$LOG
 }
 
-function b() {
-  tput bold; printf "$1"; tput sgr0;
-}
-
-function u() {
-  tput smul; printf "$1"; tput sgr0;
-}
-
-function err() {
-  >&2 printf "[ERROR] $1\n"
-  >&2 printf "Try '$SCRIPT_NAME --help' for more information\n"
-  exit 1
-}
-
-function log() {
-  >&$LOG printf "[INFO] $1\n"
-}
-
-function print_usage() {
-  cat << EOF
-$(b NAME)
-    $SCRIPT_NAME - Backup a Git repository
-
-$(b SYNOPSIS)
-    $SCRIPT_NAME [-x] [-f $(u archive)] -u $(u url)
-
-$(b DESCRIPTION)
-    Backups a Git repository by bundling it with all its references. The bundle is then packed as tar ball.
-    The archive will be placed in the current directory by default.
-
-    Unless otherwise specified via '-x' or '--no-script', a simple script to conveniently clone the bundle into the current directory is added to archive.
-
-$(b OPTIONS:)
-    -f, --file <FILE>   Custom path for the generated tar ball
-    -u, --url <URL>     Tells which url to clone the Git repository from
-    -h, --help          Shows this help message
-    -v, --verbose       Increases verbosity
-    -x, --no-script     Skips creation of the clone script
-
-$(b EXAMPLES:)
-    Backup a remote repository that is saved as 'repo.tar.gz' in the current directory along with the clone script.
-
-        $SCRIPT_NAME -u https://example.com/projects/repo.git
-
-EOF
-}
-
+##
+# Tries to determine the humanish repository name
+##
 function get_url_repository_name() {
   local url=$1
 
   # Remove trailing / from url
   if [[ "$url" = */ ]]; then url=${url##*/}; fi
-
   # Extract last path
   url=${url##*/}
-
   # Remove git prefix
   echo "${url%*.git}"
 }
 
-function cleanup() {
-  # Remove the temporary clone dir
-  if [ -n "$CLONE_DIR" ]; then
-    log "Removing temprorary clone directory"
-    rm -rf $CLONE_DIR
-  fi
-}
-
+##
+# Creates the convenience clone script $2 for repository $1
+##
 function create_clone_script() {
   local repo_name=$1; local file=$2
 
@@ -230,4 +164,142 @@ LOCAL_REPO=\${*:-${repo_name}}
 EOF
 }
 
+
+
+
+
+####################################
+##        Argument parsing        ##
+####################################
+
+##
+# Extracts the argument $2 from the string $1 and prints its value to stdout.
+# Will return exit code 1 when argument is not present.
+##
+function get_arg() {
+  local args=$1
+  local key1=$2; local key2=$3;
+  local arg
+  local found_key=false
+
+  for arg in $args; do
+    if [ "$found_key" = true ]; then val=$arg; break; fi
+    if [[ "$arg " = "$key1 " ]] || [[ "$arg " = "$key2 " ]]; then found_key=true; fi
+    if [[ "$arg" = "$key1="* ]] || [[ "$arg" = "$key2="* ]]; then found_key=true; val="${arg#*=}"; break; fi
+  done
+
+  echo "$val"
+  return $($found_key)
+}
+
+##
+# Extracts a required argument $2 from the string $1 and prints its value to stdout.
+# Will return exit code 1 when the value is an empty string.
+##
+function get_arg_req() {
+  local arg=$(get_arg "$1" ${*:2})
+  test -n "$arg" && echo "$arg"
+}
+
+##
+# Extracts an optional argument $2 from the string $1 and prints its value to stdout.
+##
+function get_arg_opt() {
+  get_arg "$1" ${*:2} || echo ""
+}
+
+##
+# Will return exit code 1 when argument $2 is not present in string $1.
+# Can be used for flag arguments for example.
+##
+function has_arg() {
+  get_arg "$1" ${*:2} >/dev/null
+}
+
+##
+# Will return the first argument from string $1 that is not specified as $1+n.
+##
+function get_unmatched_arg() {
+  local args=$1; local arg; local valid=${*:2}
+  for arg in $args; do
+    if [[ "$arg" = -* ]] && [[ ! " ${valid[*]} " = *" $arg "* ]]; then
+      echo "$arg"; break
+    fi
+  done
+}
+
+
+
+
+
+####################################
+##        Output functions        ##
+####################################
+
+##
+# Print $1 in bold
+##
+function b() {
+  tput bold; printf "$1"; tput sgr0;
+}
+
+
+##
+# Print $1 underlined
+##
+function u() {
+  tput smul; printf "$1"; tput sgr0;
+}
+
+##
+# Print to stderr and exit
+##
+function err() {
+  >&2 printf "[ERROR] $1\n"
+  >&2 printf "Try '$SCRIPT_NAME --help' for more information\n"
+  exit 1
+}
+
+##
+# Print log message when verbose mode is enabled
+##
+function log() {
+  >&$LOG printf "[INFO] $1\n"
+}
+
+##
+# Shows usage info
+##
+function print_usage() {
+  cat << EOF
+$(b NAME)
+    $SCRIPT_NAME - Backup a Git repository
+
+$(b SYNOPSIS)
+    $SCRIPT_NAME [-x] [-f $(u archive)] -u $(u url)
+
+$(b DESCRIPTION)
+    Backups a Git repository by bundling it with all its references. The bundle is then packed as tar ball.
+    The archive will be placed in the current directory by default.
+
+    Unless otherwise specified via '-x' or '--no-script', a simple script to conveniently clone the bundle into
+    the current directory is added to the archive.
+
+$(b OPTIONS:)
+    -f, --file <FILE>   Custom path for the generated tar ball
+    -u, --url <URL>     Tells which url to clone the Git repository from
+    -h, --help          Shows this help message
+    -v, --verbose       Increases verbosity
+    -x, --no-script     Skips creation of the clone script
+
+$(b EXAMPLES:)
+    Backup a remote repository that is saved as 'repo.tar.gz' in the current directory along with the clone script.
+
+        $SCRIPT_NAME -u https://example.com/projects/repo.git
+
+EOF
+}
+
+
+# Starts the program
 main "$@"

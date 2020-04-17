@@ -20,7 +20,7 @@ DESCRIPTION
     The archive will be placed in the current directory by default.
 
     Unless otherwise specified via '-x' or '--no-script', a simple script to conveniently clone the bundle into
-    the current directory is added to archive.
+    the current directory is added to the archive.
 
 OPTIONS:
     -f, --file <FILE>   Custom path for the generated tar ball
