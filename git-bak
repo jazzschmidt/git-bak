@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -xe
 
 # Register cleanup
 trap cleanup EXIT SIGINT SIGTERM
@@ -47,13 +47,6 @@ function main() {
   fi
 
   log "File path: $FILE"
-
-  # Verify file
-  touch $FILE &>/dev/null
-  if [ $? -gt 0 ]; then
-    err "Cannot create file: $FILE"
-    exit 1
-  fi
 
   # Create clone directory
   CLONE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${SCRIPT_NAME}.XXX")
