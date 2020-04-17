@@ -1,4 +1,4 @@
-#!/bin/bash -xe
+#!/bin/bash
 
 # Register cleanup
 trap cleanup EXIT SIGINT SIGTERM
