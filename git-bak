@@ -86,12 +86,11 @@ function has_arg() {
   get_arg "$1" ${*:2} >/dev/null
 }
 
-valid_args() {
+function get_unmatched_arg() {
   local args=$1; local arg; local valid=${*:2}
   for arg in $args; do
     if [[ "$arg" = -* ]] && [[ ! " ${valid[*]} " = *" $arg "* ]]; then
-      echo "$arg"
-      return 1
+      echo "$arg"; break
     fi
   done
 }
@@ -99,12 +98,9 @@ valid_args() {
 function parse_args() {
   argv=$*
 
-  has_invalid_arg=false
-  inv_arg=$(valid_args "$argv" -u --url -f --file -h --help -v --verbose -x --no-scripts) \
-    || has_invalid_arg=true
-
-  if $has_invalid_arg; then
-    err "Unknown argument: $inv_arg"; exit 1;
+  unknown_arg=$(get_unmatched_arg)
+  if ! [ -z "$unknown_arg" ]; then
+    err "Unknown argument: $unknown_arg"; exit 1;
   fi
 
 
