@@ -29,34 +29,7 @@ ARCHIVE_FILES=
 
 function main() {
   # Read arguments
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --url*|-u*)
-        if [[ "$1" != *=* ]]; then shift; fi
-        URL="${1#*=}"
-        ;;
-      --file*|-f*)
-        if [[ "$1" != *=* ]]; then shift; fi
-        FILE="${1#*=}"
-        ;;
-      --help|-h)
-        print_usage
-        exit
-        ;;
-      --verbose|-v)
-        LOG=1
-        log "Increasing verbosity"
-        ;;
-      -x|--no-script)
-        CREATE_CLONE_SCRIPT=false
-        ;;
-      *)
-        err "Unknown argument: $1"
-        exit 1
-        ;;
-    esac
-    shift
-  done
+  parse_args $*
 
   # Verify url
   if [ -z "$URL" ]; then
@@ -107,6 +80,37 @@ function main() {
 
   # Create archive
   tar -czf $FILE -C $CLONE_DIR $ARCHIVE_FILES
+}
+
+function parse_args() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --url*|-u*)
+        if [[ "$1" != *=* ]]; then shift; fi
+        URL="${1#*=}"
+        ;;
+      --file*|-f*)
+        if [[ "$1" != *=* ]]; then shift; fi
+        FILE="${1#*=}"
+        ;;
+      --help|-h)
+        print_usage
+        exit
+        ;;
+      --verbose|-v)
+        LOG=1
+        log "Increasing verbosity"
+        ;;
+      -x|--no-script)
+        CREATE_CLONE_SCRIPT=false
+        ;;
+      *)
+        err "Unknown argument: $1"
+        exit 1
+        ;;
+    esac
+    shift
+  done
 }
 
 function b() {
