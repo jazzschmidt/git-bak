@@ -6,7 +6,7 @@ trap cleanup EXIT SIGINT SIGTERM
 SCRIPT_NAME=$(basename $0)
 WORKING_DIR=$(pwd)
 
-# Disabled when not in verbose mode
+# Stream to print logs to. Will set to stdout with verbose mode enabled
 LOG="/dev/null"
 
 # Disabled when -x or --no-script is set
@@ -28,19 +28,49 @@ CLONE_DIR=
 ARCHIVE_FILES=
 
 function main() {
-  # Read arguments
-  parse_args $*
+  argv=$*
+
+  # Catch unknown arguments
+  unknown_arg=$(get_unmatched_arg "$argv" \
+    -u --url \
+    -f --file \
+    -h --help \
+    -v --verbose \
+    -x --no-script
+  )
+  if [ -n "$unknown_arg" ]; then
+    err "Unknown argument: $unknown_arg";
+  fi
+
+  # Print help
+  if has_arg "$argv" -h --help; then
+    print_usage; exit
+  fi
+
+  # Increase verbosity
+  if has_arg "$argv" -v --verbose; then
+    LOG=1; log "Increasing verbosity"
+  fi
+
+  # Disable clone script
+  if has_arg "$argv" -x --no-script; then
+    CREATE_CLONE_SCRIPT=false
+  fi
+
+  # Backup arguments
+  URL=$(get_arg_req "$argv" -u --url) || err "Repository url must be specified."
+  FILE=$(get_arg_opt "$argv" -f --file)
 
   log "Determining repository name from $URL"
   REPO_NAME=$(get_url_repository_name "$URL")
   log "Repository name: $REPO_NAME"
 
-  # Set file name
+  # Set file name if not specified
   if [ -z "$FILE" ]; then
     FILE=$WORKING_DIR/${REPO_NAME}.tar.gz
   fi
 
-  log "File path: $FILE"
+  log "Archive will be written to: $FILE"
 
   # Create clone directory
   CLONE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${SCRIPT_NAME}.XXX")
@@ -92,37 +122,6 @@ function get_unmatched_arg() {
       echo "$arg"; break
     fi
   done
-}
-
-function parse_args() {
-  argv=$*
-
-  unknown_arg=$(get_unmatched_arg "$argv" \
-    -u --url \
-    -f --file \
-    -h --help \
-    -v --verbose \
-    -x --no-script
-  )
-  if [ -n "$unknown_arg" ]; then
-    err "Unknown argument: $unknown_arg";
-  fi
-
-
-  URL=$(get_arg_req "$argv" -u --url) || err "Repository url must be specified."
-  FILE=$(get_arg_opt "$argv" -f --file)
-
-  if has_arg "$argv" -h --help; then
-    print_usage; exit
-  fi
-
-  if has_arg "$argv" -v --verbose; then
-    LOG=1; log "Increasing verbosity"
-  fi
-
-  if has_arg "$argv" -x --no-script; then
-    CREATE_CLONE_SCRIPT=false
-  fi
 }
 
 function create_backup() {
