@@ -31,12 +31,6 @@ function main() {
   # Read arguments
   parse_args $*
 
-  # Verify url
-  if [ -z "$URL" ]; then
-    err "Repository url must be specified."
-    exit 1
-  fi
-
   log "Determining repository name from $URL"
   REPO_NAME=$(get_url_repository_name "$URL")
   log "Repository name: $REPO_NAME"
@@ -104,7 +98,7 @@ function parse_args() {
   fi
 
 
-  URL=$(get_arg_opt "$argv" -u --url)
+  URL=$(get_arg "$argv" -u --url) || err "Repository url must be specified."
   FILE=$(get_arg_opt "$argv" -f --file)
 
   if has_arg "$argv" -h --help; then
@@ -146,8 +140,9 @@ function u() {
 }
 
 function err() {
-  >&2 printf "$1\n"
+  >&2 printf "[ERROR] $1\n"
   >&2 printf "Try '$SCRIPT_NAME --help' for more information\n"
+  exit 1
 }
 
 function log() {
