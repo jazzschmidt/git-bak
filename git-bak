@@ -92,7 +92,13 @@ function get_unmatched_arg() {
 function parse_args() {
   argv=$*
 
-  unknown_arg=$(get_unmatched_arg)
+  unknown_arg=$(get_unmatched_arg "$argv" \
+    -u --url \
+    -f --file \
+    -h --help \
+    -v --verbose \
+    -x --no-script
+  )
   if ! [ -z "$unknown_arg" ]; then
     err "Unknown argument: $unknown_arg"; exit 1;
   fi
