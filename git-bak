@@ -9,6 +9,21 @@ LOG="/dev/null"
 # Disabled when -x or --no-script is set
 CREATE_CLONE_SCRIPT=true
 
+# Repository url
+URL=
+
+# Humanish name of the repository
+REPO_NAME=
+
+# Archive name
+FILE=
+
+# Temporary diretory to clone to
+CLONE_DIR=
+
+# Which files to archive
+ARCHIVE_FILES=
+
 function b() {
   tput bold; printf "$1"; tput sgr0;
 }
