@@ -27,6 +27,88 @@ CLONE_DIR=
 # Which files to archive
 ARCHIVE_FILES=
 
+function main() {
+  # Read arguments
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --url*|-u*)
+        if [[ "$1" != *=* ]]; then shift; fi
+        URL="${1#*=}"
+        ;;
+      --file*|-f*)
+        if [[ "$1" != *=* ]]; then shift; fi
+        FILE="${1#*=}"
+        ;;
+      --help|-h)
+        print_usage
+        exit
+        ;;
+      --verbose|-v)
+        LOG=1
+        log "Increasing verbosity"
+        ;;
+      -x|--no-script)
+        CREATE_CLONE_SCRIPT=false
+        ;;
+      *)
+        err "Unknown argument: $1"
+        exit 1
+        ;;
+    esac
+    shift
+  done
+
+  # Verify url
+  if [ -z "$URL" ]; then
+    err "Repository url must be specified."
+    exit 1
+  fi
+
+  log "Determining repository name from $URL"
+  REPO_NAME=$(get_url_repository_name "$URL")
+  log "Repository name: $REPO_NAME"
+
+  # Set file name
+  if [ -z "$FILE" ]; then
+    FILE=$WORKING_DIR/${REPO_NAME}.tar.gz
+  fi
+
+  log "File path: $FILE"
+
+  # Verify file
+  touch $FILE &>/dev/null
+  if [ $? -gt 0 ]; then
+    err "Cannot create file: $FILE"
+    exit 1
+  fi
+
+  # Create clone directory
+  CLONE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${SCRIPT_NAME}.XXX")
+  log "Cloning into: $CLONE_DIR"
+
+  # Create the backup
+  (
+    cd $CLONE_DIR
+    git clone --mirror $URL . 1>&$LOG
+
+    # Create git bundle
+    git bundle create "gitbundle" --all 1>&$LOG
+
+    # Add simple checkout script
+    if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then
+      log "Creating clone script for $REPO_NAME"
+      create_clone_script "checkout" $REPO_NAME
+      chmod +x checkout
+    fi
+  )
+
+  ARCHIVE_FILES="gitbundle"
+  if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then ARCHIVE_FILES="$ARCHIVE_FILES checkout"; fi
+
+  # Create archive
+  tar -czf $FILE -C $CLONE_DIR $ARCHIVE_FILES
+}
+
 function b() {
   tput bold; printf "$1"; tput sgr0;
 }
@@ -114,82 +196,4 @@ LOCAL_REPO=\${*:-${clone_dir}}
 EOF
 }
 
-# Read arguments
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --url*|-u*)
-      if [[ "$1" != *=* ]]; then shift; fi
-      URL="${1#*=}"
-      ;;
-    --file*|-f*)
-      if [[ "$1" != *=* ]]; then shift; fi
-      FILE="${1#*=}"
-      ;;
-    --help|-h)
-      print_usage
-      exit
-      ;;
-    --verbose|-v)
-      LOG=1
-      log "Increasing verbosity"
-      ;;
-    -x|--no-script)
-      CREATE_CLONE_SCRIPT=false
-      ;;
-    *)
-      err "Unknown argument: $1"
-      exit 1
-      ;;
-  esac
-  shift
-done
-
-# Verify url
-if [ -z "$URL" ]; then
-  err "Repository url must be specified."
-  exit 1
-fi
-
-log "Determining repository name from $URL"
-REPO_NAME=$(get_url_repository_name "$URL")
-log "Repository name: $REPO_NAME"
-
-# Set file name
-if [ -z "$FILE" ]; then
-  FILE=$WORKING_DIR/${REPO_NAME}.tar.gz
-fi
-
-log "File path: $FILE"
-
-# Verify file
-touch $FILE &>/dev/null
-if [ $? -gt 0 ]; then
-  err "Cannot create file: $FILE"
-  exit 1
-fi
-
-# Create clone directory
-CLONE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${SCRIPT_NAME}.XXX")
-log "Cloning into: $CLONE_DIR"
-
-# Create the backup
-(
-  cd $CLONE_DIR
-  git clone --mirror $URL . 1>&$LOG
-
-  # Create git bundle
-  git bundle create "gitbundle" --all 1>&$LOG
-
-  # Add simple checkout script
-  if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then
-    log "Creating clone script for $REPO_NAME"
-    create_clone_script "checkout" $REPO_NAME
-    chmod +x checkout
-  fi
-)
-
-ARCHIVE_FILES="gitbundle"
-if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then ARCHIVE_FILES="$ARCHIVE_FILES checkout"; fi
-
-# Create archive
-tar -czf $FILE -C $CLONE_DIR $ARCHIVE_FILES
+main "$@"
