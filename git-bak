@@ -62,35 +62,67 @@ function main() {
   tar -czf $FILE -C $CLONE_DIR $ARCHIVE_FILES
 }
 
-function parse_args() {
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --url*|-u*)
-        if [[ "$1" != *=* ]]; then shift; fi
-        URL="${1#*=}"
-        ;;
-      --file*|-f*)
-        if [[ "$1" != *=* ]]; then shift; fi
-        FILE="${1#*=}"
-        ;;
-      --help|-h)
-        print_usage
-        exit
-        ;;
-      --verbose|-v)
-        LOG=1
-        log "Increasing verbosity"
-        ;;
-      -x|--no-script)
-        CREATE_CLONE_SCRIPT=false
-        ;;
-      *)
-        err "Unknown argument: $1"
-        exit 1
-        ;;
-    esac
-    shift
+function get_arg() {
+  local args=$1
+  local key1=$2; local key2=$3;
+  local arg
+  local found_key=false
+
+  for arg in $args; do
+    if [ "$found_key" = true ]; then val=$arg; break; fi
+    if [[ "$arg " = "$key1 " ]] || [[ "$arg " = "$key2 " ]]; then found_key=true; fi
+    if [[ "$arg" = "$key1="* ]] || [[ "$arg" = "$key2="* ]]; then found_key=true; val="${arg#*=}"; break; fi
   done
+
+  echo "$val"
+  return $($found_key)
+}
+
+function get_arg_opt() {
+  get_arg "$1" ${*:2} || echo ""
+}
+
+function has_arg() {
+  get_arg "$1" ${*:2} >/dev/null
+}
+
+valid_args() {
+  local args=$1; local arg; local valid=${*:2}
+  for arg in $args; do
+    if [[ "$arg" = -* ]] && [[ ! " ${valid[*]} " = *" $arg "* ]]; then
+      echo "$arg"
+      exit 1
+      return 1
+    fi
+  done
+}
+
+function parse_args() {
+  argv=$*
+
+  has_invalid_arg=false
+  inv_arg=$(valid_args "$argv" -u --url -f --file -h --help -v --verbose -x --no-scripts) \
+    || has_invalid_arg=true
+
+  if $has_invalid_arg; then
+    err "Unknown argument: $inv_arg"; exit 1;
+  fi
+
+
+  URL=$(get_arg_opt "$argv" -u --url)
+  FILE=$(get_arg_opt "$argv" -f --file)
+
+  if has_arg "$argv" -h --help; then
+    print_usage; exit
+  fi
+
+  if has_arg "$argv" -v --verbose; then
+    LOG=1; log "Increasing verbosity"
+  fi
+
+  if has_arg "$argv" -x --no-script; then
+    CREATE_CLONE_SCRIPT=false
+  fi
 }
 
 function create_backup() {
