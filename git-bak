@@ -60,20 +60,7 @@ function main() {
   log "Cloning into: $CLONE_DIR"
 
   # Create the backup
-  (
-    cd $CLONE_DIR
-    git clone --mirror $URL . 1>&$LOG
-
-    # Create git bundle
-    git bundle create "gitbundle" --all 1>&$LOG
-
-    # Add simple checkout script
-    if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then
-      log "Creating clone script for $REPO_NAME"
-      create_clone_script "checkout" $REPO_NAME
-      chmod +x checkout
-    fi
-  )
+  create_backup
 
   ARCHIVE_FILES="gitbundle"
   if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then ARCHIVE_FILES="$ARCHIVE_FILES checkout"; fi
@@ -111,6 +98,23 @@ function parse_args() {
     esac
     shift
   done
+}
+
+function create_backup() {
+  (
+    cd $CLONE_DIR
+    git clone --mirror $URL . 1>&$LOG
+
+    # Create git bundle
+    git bundle create "gitbundle" --all 1>&$LOG
+
+    # Add simple checkout script
+    if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then
+      log "Creating clone script for $REPO_NAME"
+      create_clone_script "checkout" $REPO_NAME
+      chmod +x checkout
+    fi
+  )
 }
 
 function b() {
