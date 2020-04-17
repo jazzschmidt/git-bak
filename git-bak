@@ -72,6 +72,11 @@ function get_arg() {
   return $($found_key)
 }
 
+function get_arg_req() {
+  arg=$(get_arg "$1" ${*:2})
+  test -n "$arg"
+}
+
 function get_arg_opt() {
   get_arg "$1" ${*:2} || echo ""
 }
@@ -104,7 +109,7 @@ function parse_args() {
   fi
 
 
-  URL=$(get_arg "$argv" -u --url) || err "Repository url must be specified."
+  URL=$(get_arg_req "$argv" -u --url) || err "Repository url must be specified."
   FILE=$(get_arg_opt "$argv" -f --file)
 
   if has_arg "$argv" -h --help; then
