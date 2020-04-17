@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Register cleanup
+trap cleanup EXIT SIGINT SIGTERM
+
 SCRIPT_NAME=$(basename $0)
 WORKING_DIR=$(pwd)
 
@@ -81,6 +84,14 @@ function get_url_repository_name() {
 
   # Remove git prefix
   printf ${url%*.git}
+}
+
+function cleanup() {
+  # Remove the temporary clone dir
+  if ! [ -z "$CLONE_DIR" ]; then
+    log "Removing temprorary clone directory"
+    rm -rf $CLONE_DIR
+  fi
 }
 
 function create_clone_script() {
@@ -182,7 +193,3 @@ if [ "$CREATE_CLONE_SCRIPT" = "true" ]; then ARCHIVE_FILES="$ARCHIVE_FILES check
 
 # Create archive
 tar -czf $FILE -C $CLONE_DIR $ARCHIVE_FILES
-
-log "Removing temprorary clone directory"
-# Remove clone directory
-rm -rf $CLONE_DIR
