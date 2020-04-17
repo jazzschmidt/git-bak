@@ -91,7 +91,6 @@ valid_args() {
   for arg in $args; do
     if [[ "$arg" = -* ]] && [[ ! " ${valid[*]} " = *" $arg "* ]]; then
       echo "$arg"
-      exit 1
       return 1
     fi
   done
