@@ -3,6 +3,8 @@ Simple almost-one-click Git backups.
 
 Fully backups and archives a Git repository in a tar ball. The backup archive is equipped with a convenient script to directly clone it with a single (double-)click or by calling it.
 
+![just a single click](https://media.giphy.com/media/kHmBzIxx4LRSM/source.gif)
+
 ## Overview
 Output from `--help` argument:
 ````lang=shell
